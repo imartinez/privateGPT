@@ -1,0 +1,125 @@
+---
+version: '3.9'
+
+x-ingest: &ingest
+  command: [ python, src/ingest.py ]
+  environment:
+    - SOURCE_DIRECTORY=${SOURCE_DIRECTORY:-/home/privategpt/source_documents}
+  volumes:
+    - ${SOURCE_MOUNT:-./source_documents}:/home/privategpt/source_documents
+
+services:
+  #
+  # Base service, without CUDA
+  #
+  privategpt:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+      args: [ --rm, "BASEIMAGE=python:3.10.11", LLAMA_CMAKE= ]
+    image: privategpt:test
+    command: [ python, src/privateGPT.py ]
+    environment:
+      - PERSIST_DIRECTORY=${PERSIST_DIRECTORY:-/home/privategpt/db}
+      - LLAMA_EMBEDDINGS_MODEL=${LLAMA_EMBEDDINGS_MODEL:-/home/privategpt/models/ggml-model-q4_0.bin}
+      - EMBEDDINGS_MODEL_NAME=${EMBEDDINGS_MODEL_NAME:-all-MiniLM-L6-v2}
+      - MODEL_TYPE=${MODEL_TYPE:-GPT4All}
+      - MODEL_PATH=${MODEL_PATH:-/home/privategpt/models/ggml-gpt4all-j-v1.3-groovy.bin}
+      - MODEL_N_CTX=${MODEL_N_CTX:-1000}
+    volumes:
+      - ${CACHE_MOUNT:-./cache}:/home/privategpt/.cache/torch
+      - ${MODEL_MOUNT:-./models}:/home/privategpt/models
+      - ${PERSIST_MOUNT:-./db}:/home/privategpt/db
+
+  #
+  # To run with CUDA 11.6
+  #
+  #  docker compose run --rm --build privategpt-cuda-11.6
+  #
+  privategpt-cuda-11.6:
+    extends: privategpt
+    image: privategpt:cuda-11.6
+    build:
+      args:
+        - BASEIMAGE=wallies/python-cuda:3.10-cuda11.6-runtime
+        - LLAMA_CMAKE=CMAKE_ARGS='-DLLAMA_OPENBLAS=on' FORCE_CMAKE=1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+
+  #
+  # To run with CUDA 11.7
+  #
+  #  docker compose run --rm --build privategpt-cuda-11.7
+  #
+  privategpt-cuda-11.7:
+    extends: privategpt-cuda-11.6
+    image: privategpt:cuda-11.7
+    build:
+      args: [ "BASEIMAGE=wallies/python-cuda:3.10-cuda11.7-runtime" ]
+
+  #
+  # For ingest without cuda:
+  #
+  #  docker compose run --rm --build privategpt-ingest
+  #
+  privategpt-ingest:
+    extends: privategpt
+    <<: *ingest
+
+  #
+  # To ingest using cuda 11.6:
+  #
+  #  docker compose run --rm --build privategpt-cuda-11.6-ingest
+  #
+  privategpt-cuda-11.6-ingest:
+    extends: privategpt-cuda-11.6
+    image: privategpt:cuda-11.6
+    <<: *ingest
+
+  #
+  # To ingest using cuda 11.7:
+  #
+  #  docker compose run --rm --build privategpt-cuda-11.7-ingest
+  #
+  privategpt-cuda-11.7-ingest:
+    extends: privategpt-cuda-11.7
+    image: privategpt:cuda-11.7
+    <<: *ingest
+
+  # Check your system's version using
+  #
+  #  docker compose run --rm check-cuda-version
+  #
+  # then build and test the privateGPT container
+  # using
+  #
+  #  docker compose run --rm check-cuda-<CUDAVERSION>
+  #
+  # Where <CUDAVERSION> is the version you found using 'check-cuda-version'.
+  #
+  # Example if CUDAVERSION == 11.6
+  #
+  #  docker compose run --rm --build check-cuda-11.6
+  #
+  #
+  #
+  # You can update your host's CUDA installation by downloading
+  # a recent version from
+  #
+  # https://developer.nvidia.com/cuda-downloads .
+  #
+
+  check-cuda-version:
+    image: ubuntu
+    command: [ nvidia-smi ]
+  check-cuda-11.6:
+    extends: privategpt-cuda-11.6
+    command: [ nvidia-smi ]
+  check-cuda-11.7:
+    extends: privategpt-cuda-11.7
+    command: [ nvidia-smi ]
