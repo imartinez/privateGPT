@@ -4,9 +4,13 @@ from langchain.chains import RetrievalQA
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain.vectorstores import Chroma
-from langchain.llms import GPT4All, LlamaCpp
+from langchain.llms import GPT4All, LlamaCpp, OpenAI
 import os
 import argparse
+
+
+
+
 
 load_dotenv()
 
@@ -16,6 +20,15 @@ persist_directory = os.environ.get('PERSIST_DIRECTORY')
 model_type = os.environ.get('MODEL_TYPE')
 model_path = os.environ.get('MODEL_PATH')
 model_n_ctx = os.environ.get('MODEL_N_CTX')
+
+translate_use = (os.environ.get('TRANSLATE_USE',"0") == "1") # is use translate?
+translate_engine = os.environ.get('TRANSLATE_ENGINE',"GoogleTranslator") # GoogleTranslator or OneRingTranslator.
+
+chain_type_kwargs = None
+if translate_use:
+    from translation import PROMPT
+    chain_type_kwargs = {"prompt": PROMPT}
+    print(f"IMPORTANT: You enable translation. Your data may be transferred to {translate_engine} server(s).")
 
 from constants import CHROMA_SETTINGS
 
@@ -33,10 +46,20 @@ def main():
             llm = LlamaCpp(model_path=model_path, n_ctx=model_n_ctx, callbacks=callbacks, verbose=False)
         case "GPT4All":
             llm = GPT4All(model=model_path, n_ctx=model_n_ctx, backend='gptj', callbacks=callbacks, verbose=False)
+        case "OpenAILocal":
+            llm = OpenAI(model_path=model_path, n_ctx=model_n_ctx, callbacks=callbacks, verbose=False, openai_api_key="nnn")
+            import openai
+            openai.api_base = "http://127.0.0.1:5001/v1"
+        case "KoboldApiLocal":
+            from koboldapillm import KoboldApiLLM
+            llm = KoboldApiLLM(callbacks=callbacks, verbose=False)
+        case "Dummy":
+            from koboldapillm import DummyLLM
+            llm = DummyLLM(callbacks=callbacks, verbose=False)
         case _default:
             print(f"Model {model_type} not supported!")
             exit;
-    qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=retriever, return_source_documents= not args.hide_source)
+    qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=retriever, return_source_documents= not args.hide_source, chain_type_kwargs=chain_type_kwargs)
     # Interactive questions and answers
     while True:
         query = input("\nEnter a query: ")
@@ -51,6 +74,11 @@ def main():
         print("\n\n> Question:")
         print(query)
         print("\n> Answer:")
+        if translate_use:
+            from translation import params, translator_main
+            if params["translate_system_output"]:
+                answer = translator_main(answer,"en",params["user_lang"])
+
         print(answer)
 
         # Print the relevant sources used for the answer
