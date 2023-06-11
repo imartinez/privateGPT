@@ -7,6 +7,7 @@ from langchain.vectorstores import Chroma
 from langchain.llms import GPT4All, LlamaCpp
 import os
 import argparse
+from utils import *
 
 load_dotenv()
 
@@ -21,6 +22,7 @@ target_source_chunks = int(os.environ.get('TARGET_SOURCE_CHUNKS',4))
 from constants import CHROMA_SETTINGS
 
 def main():
+    ensure_integrity(persist_directory, False)
     # Parse the command line arguments
     args = parse_arguments()
     embeddings = HuggingFaceEmbeddings(model_name=embeddings_model_name)
