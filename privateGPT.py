@@ -5,8 +5,13 @@ from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain.vectorstores import Chroma
 from langchain.llms import GPT4All, LlamaCpp
+from langchain.llms import HuggingFacePipeline
 import os
 import argparse
+
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+from transformers import LlamaTokenizer
+import torch
 
 load_dotenv()
 
@@ -15,6 +20,7 @@ persist_directory = os.environ.get('PERSIST_DIRECTORY')
 
 model_type = os.environ.get('MODEL_TYPE')
 model_path = os.environ.get('MODEL_PATH')
+model_revision = os.environ.get('MODEL_REVISION')
 model_n_ctx = os.environ.get('MODEL_N_CTX')
 target_source_chunks = int(os.environ.get('TARGET_SOURCE_CHUNKS',4))
 
@@ -34,6 +40,32 @@ def main():
             llm = LlamaCpp(model_path=model_path, n_ctx=model_n_ctx, callbacks=callbacks, verbose=False)
         case "GPT4All":
             llm = GPT4All(model=model_path, n_ctx=model_n_ctx, backend='gptj', callbacks=callbacks, verbose=False)
+        case type if type.lower().startswith('hf'):
+            type = type.lower()
+
+			# Special case for llama-based models where the tokenizer's case is
+			# LLaMATokenizer instead of LlamaTokenizer.
+            if type.count('llama') or model_path.lower().count('llama'):
+                tokenizer = LlamaTokenizer.from_pretrained(model_path)
+            else:
+                tokenizer = AutoTokenizer.from_pretrained(model_path)
+            model = AutoModelForCausalLM.from_pretrained(model_path,
+                             revision = model_revision,
+                             device_map='auto',
+                             torch_dtype = torch.float16 if type.count('cuda') and type.count('16') else torch.float32,
+                             load_in_8bit = True if type.count('cuda') and type.count('8') else False)
+            if type.count('cuda'):
+                if type.count('8'):
+                    device = None
+                else:
+                    device = 'cuda:0'
+                    model.cuda()
+            else:
+                device = 'cpu'
+            pipe = pipeline('text-generation', model=model, tokenizer=tokenizer, max_new_tokens=100, device=device)
+            pipe.model.config.pad_token_id = pipe.model.config.eos_token_id
+            model_kwargs = {'device': device}
+            llm = HuggingFacePipeline(pipeline=pipe, model_kwargs=model_kwargs)
         case _default:
             print(f"Model {model_type} not supported!")
             exit;
