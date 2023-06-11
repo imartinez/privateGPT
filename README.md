@@ -100,6 +100,11 @@ Note: you could turn off your internet connection, and the script inference woul
 
 Type `exit` to finish the script.
 
+## Conversation UI chat
+```shell
+python privateGPT_uichat.py --server-name "0.0.0.0" --server-port 8071
+```
+<img width=100% src="https://user-images.githubusercontent.com/78080480/238135659-ea0d07d9-8372-4fc3-80ed-20d804e77972.PNG">
 
 ### CLI
 The script also supports optional command-line arguments to modify its behavior. You can see a full list of these arguments by running the command ```python privateGPT.py --help``` in your terminal.
