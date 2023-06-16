@@ -76,7 +76,7 @@ LOADER_MAPPING = {
     ".pdf": (PyMuPDFLoader, {}),
     ".ppt": (UnstructuredPowerPointLoader, {}),
     ".pptx": (UnstructuredPowerPointLoader, {}),
-    ".txt": (TextLoader, {"encoding": "utf8"}),
+    ".txt": (TextLoader, {"encoding": "utf8", "autodetect_encoding": True}),
     # Add more mappings for other file extensions and loaders as needed
 }
 
