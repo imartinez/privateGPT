@@ -4,6 +4,8 @@ import glob
 from typing import List
 from dotenv import load_dotenv
 from multiprocessing import Pool
+import logging as logger
+import pdfminer
 from tqdm import tqdm
 
 from langchain.document_loaders import (
@@ -82,13 +84,19 @@ LOADER_MAPPING = {
 
 
 def load_single_document(file_path: str) -> List[Document]:
-    ext = "." + file_path.rsplit(".", 1)[-1]
-    if ext in LOADER_MAPPING:
-        loader_class, loader_args = LOADER_MAPPING[ext]
-        loader = loader_class(file_path, **loader_args)
-        return loader.load()
-
-    raise ValueError(f"Unsupported file extension '{ext}'")
+    try:
+        ext = "." + file_path.rsplit(".", 1)[-1]
+        if ext in LOADER_MAPPING:
+            loader_class, loader_args = LOADER_MAPPING[ext]
+            loader = loader_class(file_path, **loader_args)
+            return loader.load()
+    except ValueError as e:
+        logger.log(logger.ERROR, f"Unsupported file extension '{ext}' for file {file_path}: {e}\n Ignoring {file_path}!")
+    except pdfminer.pdfparser.PDFSyntaxError as e:
+        logger.log(logger.ERROR, f"PDFSyntaxError for file {file_path}: {e}\n Ignoring {file_path}!")
+    except Exception as e:
+        logger.log(logger.Error, f"Error loading file {file_path}: {e}\n Ignoring {file_path}!")
+        
 
 def load_documents(source_dir: str, ignored_files: List[str] = []) -> List[Document]:
     """
@@ -105,8 +113,12 @@ def load_documents(source_dir: str, ignored_files: List[str] = []) -> List[Docum
         results = []
         with tqdm(total=len(filtered_files), desc='Loading new documents', ncols=80) as pbar:
             for i, docs in enumerate(pool.imap_unordered(load_single_document, filtered_files)):
-                results.extend(docs)
+                if docs is not None:
+                    results.extend(docs)
                 pbar.update()
+
+    if len(results) < len(filtered_files):
+        logger.log(logger.WARNING, f"Failed to load {len(filtered_files) - len(results)} documents")
 
     return results
 
