@@ -44,7 +44,9 @@ def main():
     # Interactive questions and answers
     while True:
         query = input("\nEnter a query: ")
-        if query == "exit":
+        query=query.strip()
+        if query.lower().startswith("exit") or query.lower().startswith("quit"):
+            print("Terminating program.")
             break
         if query.strip() == "":
             continue
