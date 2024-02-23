@@ -104,24 +104,29 @@ class TagPromptStyle(AbstractPromptStyle):
     FIXME: should we add surrounding `<s>` and `</s>` tags, like in llama2?
     """
 
+    def format_message_from_user(self, role: str, content: str) -> str:
+        return f"<|{role.lower()}|>: {content.strip()}"
+
+    def assistant_prompt(self) -> str:
+        return "<|assistant|>: "
+
     def _messages_to_prompt(self, messages: Sequence[ChatMessage]) -> str:
         """Format message to prompt with `<|ROLE|>: MSG` style."""
         prompt = ""
         for message in messages:
             role = message.role
             content = message.content or ""
-            message_from_user = f"<|{role.lower()}|>: {content.strip()}"
+            message_from_user = self.format_message_from_user(role, content)
             message_from_user += "\n"
             prompt += message_from_user
         # we are missing the last <|assistant|> tag that will trigger a completion
-        prompt += "<|assistant|>: "
+        prompt += self.assistant_prompt()
         return prompt
 
     def _completion_to_prompt(self, completion: str) -> str:
         return self._messages_to_prompt(
             [ChatMessage(content=completion, role=MessageRole.USER)]
         )
-
 
 class MistralPromptStyle(AbstractPromptStyle):
     def _messages_to_prompt(self, messages: Sequence[ChatMessage]) -> str:
