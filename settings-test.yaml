@@ -17,5 +17,8 @@ llm:
 embedding:
   mode: mock
 
+reranker:
+  enabled: false
+
 ui:
   enabled: false

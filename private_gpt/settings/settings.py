@@ -114,6 +114,29 @@ class NodeStoreSettings(BaseModel):
     database: Literal["simple", "postgres"]
 
 
+class FlagEmbeddingReRankerSettings(BaseModel):
+    hf_model_name: str = Field(
+        "BAAI/bge-reranker-large",
+        description="Name of the HuggingFace model to use for reranking",
+    )
+    top_n: int = Field(
+        5,
+        description="Top N nodes to return.",
+    )
+    cut_off: float = Field(
+        0.75,
+        description="Cut off score for nodes.",
+    )
+
+
+class RerankerSettings(BaseModel):
+    enabled: bool = Field(
+        False,
+        description="Flag indicating if reranker is enabled or not",
+    )
+    mode: Literal["flagembedding"]
+
+
 class LlamaCPPSettings(BaseModel):
     llm_hf_repo_id: str
     llm_hf_model_file: str
@@ -391,6 +414,8 @@ class Settings(BaseModel):
     vectorstore: VectorstoreSettings
     nodestore: NodeStoreSettings
     rag: RagSettings
+    reranker: RerankerSettings
+    flagembedding_reranker: FlagEmbeddingReRankerSettings
     qdrant: QdrantSettings | None = None
     postgres: PostgresSettings | None = None
 

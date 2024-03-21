@@ -1,0 +1,57 @@
+# Reranker
+
+PrivateGPT supports the integration with the `Reranker` which has the potential to enhance the performance of the Retrieval-Augmented Generation (RAG) system.
+
+Currently we only support `flagembedding` as reranker mode, in order to use it, set the `reranker.mode` property in the `settings.yaml` file to `flagembedding`.
+
+```yaml
+reranker:
+  mode: flagembedding
+  enabled: true
+```
+
+Use the `enabled` flag to toggle the `Reranker` as per requirement for optimized results.
+
+## FlagEmbeddingReranker
+
+To enable FlagEmbeddingReranker, set the `reranker.mode` property in the `settings.yaml` file to `flagembedding` and install the `reranker-flagembedding` extra.
+
+```bash
+poetry install --extras reranker-flagembedding
+```
+
+Download / Setup models from huggingface.
+
+```bash
+poetry run python scripts/setup
+```
+
+The FlagEmbeddingReranker can be configured using the following parameters:
+
+- **top_n**: Represents the number of top documents to retrieve.
+- **cut_off**: A threshold score for similarity below which documents are dismissed.
+- **hf_model_name**: The Hugging Face model identifier for the FlagReranker.
+
+### Behavior of Reranker
+
+The functionality of the `Reranker` is as follows:
+
+1. It evaluates the similarity between a query and documents retrieved by the retriever.
+2. If the similarity score is less than `cut_off`, the document is excluded from the results.
+3. In scenarios where the filtered documents are fewer than `top_n`, the system defaults to providing the top `top_n` documents ignoring the `cut_off` score.
+4. The `hf_model_name` parameter allows users to specify the particular FlagReranker model from [Hugging Face](https://huggingface.co/) for the reranking process.
+
+### Example Usage
+
+To utilize the `Reranker` with your desired settings:
+
+```yml
+flagembedding_reranker:
+  hf_model_name: BAAI/bge-reranker-large
+  top_n: 5
+  cut_off: 0.75
+```
+
+## Conclusion
+
+`Reranker` serves as a [Node Postprocessor](https://docs.llamaindex.ai/en/stable/module_guides/querying/node_postprocessors/root.html). With these settings, it offers a robust and flexible way to improve the performance of the RAG system by filtering and ranking the retrieved documents based on relevancy.
