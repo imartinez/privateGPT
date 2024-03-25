@@ -2,7 +2,6 @@ FROM python:3.11.6-slim-bookworm as base
 
 # Install poetry
 RUN pip install pipx
-RUN python3 -m pipx ensurepath
 RUN pipx install poetry
 ENV PATH="/root/.local/bin:$PATH"
 ENV PATH=".venv/bin/:$PATH"
@@ -14,27 +13,38 @@ FROM base as dependencies
 WORKDIR /home/worker/app
 COPY pyproject.toml poetry.lock ./
 
-RUN poetry install --extras "ui vector-stores-qdrant"
+ARG POETRY_EXTRAS="ui vector-stores-qdrant"
+RUN poetry install --extras "${POETRY_EXTRAS}"
 
 FROM base as app
-
-ENV PYTHONUNBUFFERED=1
-ENV PORT=8080
+ENV \
+  PYTHONUNBUFFERED=1 \
+  PORT=8080 \
+  PYTHONPATH="$PYTHONPATH:/home/worker/app/private_gpt/" \
+  APP_ENV=prod \
+  PGPT_MODE=mock \
+  PGPT_EMBEDDING_MODE=sagemaker \
+  PGPT_HF_REPO_ID=TheBloke/Mistral-7B-Instruct-v0.1-GGUF \
+  PGPT_HF_MODEL_FILE=mistral-7b-instruct-v0.1.Q4_K_M.gguf \
+  PGPT_EMBEDDING_HF_MODEL_NAME=BAAI/bge-small-en-v1.5 \
+  PGPT_SAGEMAKER_LLM_ENDPOINT_NAME= \
+  PGPT_SAGEMAKER_EMBEDDING_ENDPOINT_NAME=
 EXPOSE 8080
 
 # Prepare a non-root user
-RUN adduser --system worker
+ARG UID=100
+ARG GID=65534
+RUN adduser --system --uid ${UID} --gid ${GID} --home /home/worker worker
 WORKDIR /home/worker/app
 
-RUN mkdir local_data; chown worker local_data
-RUN mkdir models; chown worker models
+RUN mkdir local_data && chown worker local_data
+RUN mkdir models && chown worker models
 COPY --chown=worker --from=dependencies /home/worker/app/.venv/ .venv
 COPY --chown=worker private_gpt/ private_gpt
 COPY --chown=worker fern/ fern
-COPY --chown=worker *.yaml *.md ./
+COPY --chown=worker *.yaml .
 COPY --chown=worker scripts/ scripts
-
-ENV PYTHONPATH="$PYTHONPATH:/private_gpt/"
+COPY --chown=worker Makefile .
 
 USER worker
 ENTRYPOINT python -m private_gpt
